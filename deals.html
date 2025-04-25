@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ricerca Annunci</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background-color: #f4f4f9;
+      color: #333;
+    }
+
+    h1 {
+      text-align: center;
+      color: #2c3e50;
+    }
+
+    .search-container {
+      max-width: 950px;
+      margin: 0 auto;
+      background-color: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      margin-bottom: 30px;
+    }
+
+    .search-container label {
+      font-size: 14px;
+      margin-bottom: 5px;
+      display: block;
+      color: #555;
+    }
+
+    .search-container input, .search-container select, .search-container button {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      font-size: 14px;
+    }
+
+    .search-container input[type="number"] {
+      width: 48%;
+      display: inline-block;
+      margin-right: 4%;
+    }
+
+    .search-container input[type="number"]:last-child {
+      margin-right: 0;
+    }
+
+    .search-container button {
+      background-color: #3498db;
+      color: white;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+    }
+
+    .search-container button:hover {
+      background-color: #2980b9;
+    }
+
+    #container {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 20px;
+      margin-top: 20px;
+    }
+
+    .ad-card {
+      background-color: white;
+      border-radius: 10px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+      padding: 10px;
+      text-align: center;
+      transition: transform 0.2s;
+      cursor: pointer;
+    }
+
+    .ad-card:hover {
+      transform: translateY(-5px);
+    }
+
+    .ad-card img {
+      width: 100%;
+      height: 150px;
+      object-fit: cover;
+      border-radius: 8px;
+    }
+
+    .ad-card h3 {
+      font-size: 18px;
+      margin: 10px 0;
+    }
+
+    .ad-card p {
+      font-size: 14px;
+      color: #555;
+      margin: 5px 0;
+    }
+
+    .ad-card .price {
+      font-size: 16px;
+      color: #e74c3c;
+      font-weight: bold;
+    }
+
+    .ad-card .date {
+      font-size: 12px;
+      color: #777;
+    }
+
+    .default-image {
+      width: 100%;
+      height: 150px;
+      background-color: #dcdcdc;
+      color: #777;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 14px;
+      text-align: center;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Ricerca Annunci</h1>
+
+  <div class="search-container" id="searchContainer">
+    <label for="searchQuery">Nome dell'oggetto da cercare:</label>
+    <input type="text" id="searchQuery" placeholder="Es. smartphone" />
+
+    <label for="bodyIncludes">Parole da includere nella descrizione:</label>
+    <input type="text" id="bodyIncludes" placeholder="Parole da includere" />
+
+    <label for="bodyExcludes">Parole da escludere nella descrizione:</label>
+    <input type="text" id="bodyExcludes" placeholder="Parole da escludere" />
+
+    <label for="minPrice">Prezzo minimo (€):</label>
+    <input type="number" id="minPrice" placeholder="Minimo" />
+
+    <label for="maxPrice">Prezzo massimo (€):</label>
+    <input type="number" id="maxPrice" placeholder="Massimo" />
+
+    <label for="sortOrder">Ordina per:</label>
+    <select id="sortOrder">
+      <option value="relevance">Rilevanza</option>
+      <option value="datedesc">Data (dal più recente)</option>
+      <option value="priceasc">Prezzo (dal più basso)</option>
+    </select>
+
+    <button onclick="getAllUrls()">Cerca</button>
+  </div>
+
+  <div id="container"></div>
+
+  <script>
+    const getAllUrls = async () => {
+      const searchQuery = document.getElementById('searchQuery').value.trim();
+      const bodyIncludes = document.getElementById('bodyIncludes').value.trim();
+      const bodyExcludes = document.getElementById('bodyExcludes').value.trim();
+      const minPrice = parseFloat(document.getElementById('minPrice').value) || 0;
+      const maxPrice = parseFloat(document.getElementById('maxPrice').value) || Infinity;
+      const sortOrder = document.getElementById('sortOrder').value;
+
+      if (!searchQuery) {
+        alert("Inserisci un nome per la ricerca!");
+        return;
+      }
+
+      // Nasconde il div con i campi input
+      document.getElementById('searchContainer').style.display = 'none';
+
+      const limit = 100;
+      let start = 0;
+      const container = document.getElementById('container');
+      container.innerHTML = ""; // Pulisce i risultati precedenti
+
+      while (true) {
+        const url = `https://hades.subito.it/v1/search/items?q=${encodeURIComponent(searchQuery)}&t=s&qso=false&shp=true&urg=false&sort=${sortOrder}&lim=${limit}&start=${start}`;
+
+        try {
+          const response = await fetch(url);
+          const data = await response.json();
+          const ads = data?.ads || [];
+
+          if (ads.length === 0) break;
+
+          ads.forEach(ad => {
+            const body = ad.body || "";
+            const price = ad.features?.[1]?.values?.[0]?.value || "";
+            const priceWithEuro = price.includes('€') ? price : '';
+
+            // Filtro per descrizione
+            if (bodyIncludes && !body.toLowerCase().includes(bodyIncludes.toLowerCase())) return;
+            if (bodyExcludes && body.toLowerCase().includes(bodyExcludes.toLowerCase())) return;
+
+            // Filtro per prezzo (escludo "Prezzo non disponibile" se minPrice è maggiore o uguale a 0)
+            const priceValue = parseFloat(priceWithEuro.replace('€', '').trim());
+            if ((minPrice >= 0 && (isNaN(priceValue) || priceWithEuro === '')) || (minPrice && priceValue < minPrice) || (maxPrice && priceValue > maxPrice)) {
+              return;
+            }
+
+            // Immagine di default se non presente
+            const imageUrl = ad.images?.[0]?.scale?.[3]?.uri || '';
+            const imageElement = imageUrl ? `<img src="${imageUrl}" alt="Immagine" />` : `
+              <div class="default-image">Image not found</div>
+            `;
+
+            // Salvataggio dei dati dell'annuncio
+            const adData = {
+              url: ad.urls.default,
+              subject: ad.subject,
+              body: ad.body,
+              date: ad.dates?.display,
+              image: imageElement,
+              price: priceWithEuro,
+            };
+
+            const adCard = document.createElement('div');
+            adCard.classList.add('ad-card');
+
+            adCard.innerHTML = `
+              ${adData.image}
+              <h3>${adData.subject}</h3>
+              <p class="price">${adData.price || 'Prezzo non disponibile'}</p>
+              <p class="date">${adData.date || 'Data non disponibile'}</p>
+            `;
+
+            // Aggiungi un evento di clic che reindirizza l'utente al link dell'annuncio
+            adCard.addEventListener('click', () => {
+              window.open(adData.url, '_blank');
+            });
+
+            container.appendChild(adCard);
+          });
+
+          start += limit; // Incrementa l'indice per caricare i prossimi risultati
+
+        } catch (error) {
+          console.error("Errore:", error);
+          alert("Si è verificato un errore durante la ricerca.");
+          break;
+        }
+      }
+
+      console.log("Tutti gli annunci sono stati recuperati.");
+    };
+  </script>
+
+</body>
+</html>
